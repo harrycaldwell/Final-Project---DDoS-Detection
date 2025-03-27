@@ -16,6 +16,7 @@ local counter = 0
 local port = 80
 
 -- Menu Gui stuff
+-- Menu for setting thershold
 local threshold_menu = {
     title = "Set Threshold",
     action = function()
@@ -49,6 +50,7 @@ local threshold_menu = {
         end,
     path = "Analyze/DDoS Detection/Set Threshold"
     }
+-- Menu for setting the port
 local port_menu = {
     title = "Set Port",
     action = function()
