@@ -72,8 +72,8 @@ local function port_action()
 end
 
 if gui_enabled() then
-    register_menu("Analyze/DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
-    register_menu("Analyze/DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
 end
 
 -- Functions to handle packet analysis for SYNFlood
