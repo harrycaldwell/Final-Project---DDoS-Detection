@@ -5,103 +5,16 @@ local plugin_info = {
     repository = "https://github.com/harrycaldwell/Final-Project---DDoS-Detection"
 }
 
-
--- Creation of required variables and "proto" functions
 -- Proto Declarations
-local SynFlood = proto("SYNFlood", "SYN Flood Attack Detection")
+local SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
 
 -- Variable Declarations
 local threshold = 0
-local counter = 0
 local port = 80
-
--- Menu Gui stuff
--- Menu for setting thershold
-local threshold_menu = {
-    title = "Set Threshold",
-    action = function()
-        -- Create the prompt to allow the user to enter a value for the threshold
-        local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
-        local input = nil
-        if handle then
-            input = handle:read("*a")
-            handle:close()
-            else
-                Create_popup("Failed to open input prompt.")
-                return
-            end
-
-            -- Trim whitespace from input
-            input = input:match("^%s*(.-)%s*$")
-
-            -- Check if input is empty or invalid
-            if not input or input == "" then
-                Create_popup("Threshold update canceled.")
-                return
-            end
-
-            -- Convert the input into a number
-            local new_threshold = tonumber(input)
-            if new_threshold then
-                Set_threshold(new_threshold)
-            else
-                Create_popup("Invalid Threshold Value. Please use a non-negative number.")
-            end
-        end,
-    path = "Analyze/DDoS Detection/Set Threshold"
-    }
--- Menu for setting the port
-local port_menu = {
-    title = "Set Port",
-    action = function()
-        -- Create the prompt to allow the user to enter a value for the port
-        local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
-        local input = nil
-        if handle then
-            input = handle:read("*a")
-            handle:close()
-            else
-                Create_popup("Failed to open input prompt.")
-                return
-            end
-
-        -- Trim whitespace from input
-        input = input:match("^%s*(.-)%s*$")
-
-        -- Check if input is empty or invalid
-        if not input or input == "" then
-            Create_popup("Port update canceled.")
-            return
-        end
-
-        -- Convert the input into a number
-        local new_port = tonumber(input)
-        if new_port then
-            Set_port(new_port)
-            else
-                Create_popup("Invalid Port Number. Please use a non-negative number.")
-            end
-        end,
-    path = "Analyze/DDoS Detection/Set Port"
-    }
-
-if gui_enabled() == true then
-    -- Register the menus
-    register_menu(port_menu)
-    register_menu(threshold_menu)
-end
-
--- TODO: Functionality for if Wireshark is not running in GUI mode
-if gui_enabled() == false then
-
-    
-end
-
 
 -- Functions to create Pop-up windows
 function Create_popup(message)
-    -- This function uses zenity to create the pop up message
-    os.execute("zenity --info --text=\"" .. message .. "\"")
+    os.execute("zenity --info --text='" .. message .. "'")
 end
 
 -- Function that allows user to set port
@@ -124,10 +37,48 @@ function Set_threshold(new_threshold)
     end
 end
 
+-- Menu for setting threshold
+local function threshold_action()
+    local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
+    if handle then
+        local input = handle:read("*a"):match("^%s*(.-)%s*$")
+        handle:close()
+        local new_threshold = tonumber(input)
+        if new_threshold then
+            Set_threshold(new_threshold)
+        else
+            Create_popup("Invalid Threshold Value. Please use a non-negative number.")
+        end
+    else
+        Create_popup("Failed to open input prompt.")
+    end
+end
+
+-- Menu for setting the port
+local function port_action()
+    local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
+    if handle then
+        local input = handle:read("*a"):match("^%s*(.-)%s*$")
+        handle:close()
+        local new_port = tonumber(input)
+        if new_port then
+            Set_port(new_port)
+        else
+            Create_popup("Invalid Port Number. Please use a non-negative number.")
+        end
+    else
+        Create_popup("Failed to open input prompt.")
+    end
+end
+
+if gui_enabled() then
+    register_menu("Analyze/DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("Analyze/DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
+end
+
 -- Functions to handle packet analysis for SYNFlood
 function SynFlood.dissector(buffer, pinfo, tree)
-    -- TODO: Write script that enables functionality for this dissector
-
+    -- TODO: Implement SYN flood detection logic here
 end
 
 -- Registering of the dissectors
