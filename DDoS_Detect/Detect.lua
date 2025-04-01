@@ -7,20 +7,22 @@ local plugin_info = {
 
 -- Proto Declarations
 local SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
+local UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
+local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 
 -- Variable Declarations
 local threshold = 0
 local port = 80
 
---Functionality for the GUI stuff
+local dissector_states = {
+    SYNFlood = false,
+    UDPFlood = false,
+    IMCPFlood = false
+}
+
 -- Functions to create Pop-up windows
 function Create_popup(message)
     os.execute("zenity --info --text='" .. message .. "'")
-end
-
--- Alert Functions
-function Alert()
-    -- TODO: Implement alert functionality
 end
 
 -- Function that allows user to set port
@@ -44,23 +46,18 @@ function Set_threshold(new_threshold)
 end
 
 -- Menu actions
--- Menu action for setting the threshold
 local function threshold_action()
     local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
     if handle then
         local input = handle:read("*a")
         handle:close()
-
-        -- Trim whitespace
         input = input and input:match("^%s*(.-)%s*$") or ""
 
-        -- Handle cancellation
         if input == "" then
             Create_popup("Threshold update canceled.")
             return
         end
 
-        -- Convert to number and validate
         local new_threshold = tonumber(input)
         if new_threshold then
             Set_threshold(new_threshold)
@@ -72,24 +69,18 @@ local function threshold_action()
     end
 end
 
-
--- Menu action for setting the port
 local function port_action()
     local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
     if handle then
         local input = handle:read("*a")
         handle:close()
-
-        -- Trim whitespace
         input = input and input:match("^%s*(.-)%s*$") or ""
 
-        -- Handle cancellation
         if input == "" then
             Create_popup("Port update canceled.")
             return
         end
 
-        -- Convert to number and validate
         local new_port = tonumber(input)
         if new_port then
             Set_port(new_port)
@@ -101,17 +92,42 @@ local function port_action()
     end
 end
 
--- Gui stuff
+-- Function to enable/disable the dissectors
+function toggle_dissector(dissector_name)
+    if dissector_states[dissector_name] ~= nil then
+        dissector_states[dissector_name] = not dissector_states[dissector_name]
+        print(dissector_name .. " is now " .. (dissector_states[dissector_name] and "enabled" or "disabled"))
+    else
+        print("Invalid dissector name: " .. dissector_name)
+    end
+end
+
+-- GUI Menu
 if gui_enabled() then
-    register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Settings/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Settings/Set Port", port_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Detection/SYN Flood/Enable-Disable", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Detection/UDP Flood/Enable-Disable", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Detection/ICMP Flood/Enable-Disable", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
 end
 
 -- Functions to handle packet analysis for SYNFlood
 function SynFlood.dissector(buffer, pinfo, tree)
-    -- TODO: Implement SYN flood detection logic here
+    if not dissector_states["SYNFlood"] then return end
+    -- SYN Flood Detection Logic Here
+end
+
+function UDPFlood.dissector(buffer, pinfo, tree)
+    if not dissector_states["UDPFlood"] then return end
+    -- UDP Flood Detection Logic Here
+end
+
+function IMCPFlood.dissector(buffer, pinfo, tree)
+    if not dissector_states["IMCPFlood"] then return end
+    -- ICMP Flood Detection Logic Here
 end
 
 -- Registering of the dissectors
 register_postdissector(SynFlood)
-
+register_postdissector(UDPFlood)
+register_postdissector(IMCPFlood)
