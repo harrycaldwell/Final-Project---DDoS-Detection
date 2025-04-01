@@ -18,6 +18,11 @@ function Create_popup(message)
     os.execute("zenity --info --text='" .. message .. "'")
 end
 
+-- Alert Functions
+function Alert()
+    -- TODO: Implement alert functionality
+end
+
 -- Function that allows user to set port
 function Set_port(new_port)
     if type(new_port) == "number" and new_port >= 0 then
@@ -96,7 +101,6 @@ local function port_action()
     end
 end
 
-
 -- Gui stuff
 if gui_enabled() then
     register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
@@ -111,7 +115,3 @@ end
 -- Registering of the dissectors
 register_postdissector(SynFlood)
 
--- Alert Functions
-function Alert()
-    -- TODO: Implement alert functionality
-end
