@@ -12,6 +12,7 @@ local SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
 local threshold = 0
 local port = 80
 
+--Functionality for the GUI stuff
 -- Functions to create Pop-up windows
 function Create_popup(message)
     os.execute("zenity --info --text='" .. message .. "'")
@@ -37,12 +38,24 @@ function Set_threshold(new_threshold)
     end
 end
 
--- Menu for setting threshold
+-- Menu actions
+-- Menu action for setting the threshold
 local function threshold_action()
     local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
     if handle then
-        local input = handle:read("*a"):match("^%s*(.-)%s*$")
+        local input = handle:read("*a")
         handle:close()
+
+        -- Trim whitespace
+        input = input and input:match("^%s*(.-)%s*$") or ""
+
+        -- Handle cancellation
+        if input == "" then
+            Create_popup("Threshold update canceled.")
+            return
+        end
+
+        -- Convert to number and validate
         local new_threshold = tonumber(input)
         if new_threshold then
             Set_threshold(new_threshold)
@@ -54,12 +67,24 @@ local function threshold_action()
     end
 end
 
--- Menu for setting the port
+
+-- Menu action for setting the port
 local function port_action()
     local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
     if handle then
-        local input = handle:read("*a"):match("^%s*(.-)%s*$")
+        local input = handle:read("*a")
         handle:close()
+
+        -- Trim whitespace
+        input = input and input:match("^%s*(.-)%s*$") or ""
+
+        -- Handle cancellation
+        if input == "" then
+            Create_popup("Port update canceled.")
+            return
+        end
+
+        -- Convert to number and validate
         local new_port = tonumber(input)
         if new_port then
             Set_port(new_port)
@@ -71,6 +96,8 @@ local function port_action()
     end
 end
 
+
+-- Gui stuff
 if gui_enabled() then
     register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
