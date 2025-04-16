@@ -181,6 +181,26 @@ function IMCPFlood.dissector(buffer, pinfo, tree)
 end
 
 -- Registering of the dissectors
-register_postdissector(SynFlood)
-register_postdissector(UDPFlood)
-register_postdissector(IMCPFlood)
+local success = pcall(function()
+    register_postdissector(SynFlood)
+    print("SYN Flood dissector registered successfully")
+end)
+if not success then
+    print("Failed to register SYN Flood dissector")
+end
+
+success = pcall(function()
+    register_postdissector(UDPFlood)
+    print("UDP Flood dissector registered successfully")
+end)
+if not success then
+    print("Failed to register UDP Flood dissector")
+end
+
+success = pcall(function()
+    register_postdissector(IMCPFlood)
+    print("ICMP Flood dissector registered successfully")
+end)
+if not success then
+    print("Failed to register ICMP Flood dissector")
+end
