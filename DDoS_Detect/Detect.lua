@@ -25,6 +25,9 @@ local syn_tracker = {}
 local udp_tracker = {}
 local icmp_tracker = {}
 
+-- Field Extractors
+local tcp_flags_f = Field.new("tcp.flags")
+
 -- Functions to create Pop-up windows
 function Create_popup(message)
     os.execute("zenity --info --text='" .. message .. "'")
@@ -116,50 +119,36 @@ if gui_enabled() then
     register_menu("DDoS Detection/Detection/ICMP Flood/Enable-Disable", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
 end
 
--- Functions to handle packet analysis for SYNFlood
+-- SYN Flood Detection
 function SynFlood.dissector(buffer, pinfo, tree)
-    if not dissector_states["SYNFlood"] then 
-        return 
-    end
+    if not dissector_states["SYNFlood"] then return end
 
-    -- SYN Flood Detection Logic Here
-    -- Ensure the packet has enough data for TCP analysis
-    if not pinfo.cols.protocol or pinfo.cols.protocol ~= "TCP" then
-        return
-    end
+    
+    local tcp_flags_field = tcp_flags_f()
+    if not tcp_flags_field then return end
 
-    -- Extract IP and TCP information
-    local src_ip = tostring(pinfo.src)
-    local dst_ip = tostring(pinfo.dst)
-    local dst_port = tostring(pinfo.dst_port)
-
-    -- Check if the SYN flag is set
-    local tcp_flags = pinfo.tcp_flags
-    if not tcp_flags or tcp_flags & 0x02 == 0 then
+    local tcp_flags = tonumber(tostring(tcp_flags_field))
+    if bit.band(tcp_flags, 0x02) == 0 then
         return -- Skip if SYN flag is not set
     end
 
-    -- Create a unique key for the destination
+    -- Extract IP and port
+    local src_ip = tostring(pinfo.src)
+    local dst_ip = tostring(pinfo.dst)
+    local dst_port = tostring(pinfo.dst_port)
     local key = dst_ip .. ":" .. dst_port
 
-    -- Initialize tracking for this destination if not already present
-    if not syn_tracker[key] then
-        syn_tracker[key] = 0
-    end
+    -- Count SYN packets
+    syn_tracker[key] = (syn_tracker[key] or 0) + 1
+    print(syn_tracker[key])
 
-    -- Increment the SYN packet count
-    syn_tracker[key] = syn_tracker[key] + 1
-
-    -- Check if the SYN packet count exceeds the threshold
-    if syn_tracker[key] > threshold then
-        --Send the Alert as a pop-up (only if GUI is enabled)
+    -- Trigger detection
+    if syn_tracker[key] >= threshold then
         if gui_enabled() then
             Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
         end
-        -- Print to console
         print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
 
-        -- Also add a warning to the packet details in Wireshark
         local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
         subtree:add(buffer(), "SYN Flood detected: " .. key)
         subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key])
@@ -167,17 +156,15 @@ function SynFlood.dissector(buffer, pinfo, tree)
     end
 end
 
-
+-- Placeholder UDP and ICMP Flood Detection
 function UDPFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["UDPFlood"] then return end
-    -- UDP Flood Detection Logic Here
-
+    -- Add UDP flood detection logic here
 end
 
 function IMCPFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["IMCPFlood"] then return end
-
-    -- ICMP Flood Detection Logic Here
+    -- Add ICMP flood detection logic here
 end
 
 -- Registering of the dissectors
