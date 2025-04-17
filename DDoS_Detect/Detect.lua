@@ -140,7 +140,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
 
     -- Count SYN packets
     syn_tracker[key] = (syn_tracker[key] or 0) + 1
-    print(syn_tracker[key])
+    -- DEBUG :print(syn_tracker[key])
 
     -- Trigger detection
     if syn_tracker[key] >= threshold then
