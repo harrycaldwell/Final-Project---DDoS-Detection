@@ -13,6 +13,7 @@ local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 -- Variable Declarations
 local threshold = 0
 local port = 80
+local ttl = 60 -- Time to live for the packets when tracking (in seconds)
 
 local dissector_states = {
     SYNFlood = false,
@@ -136,7 +137,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
     local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
     local dst_port = tostring(pinfo.dst_port)
-    local key = dst_ip .. ":" .. dst_port
+    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     -- Count SYN packets
     syn_tracker[key] = (syn_tracker[key] or 0) + 1
@@ -160,6 +161,36 @@ end
 function UDPFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["UDPFlood"] then return end
     -- Add UDP flood detection logic here
+    
+    if not pinfo.cols.protocol or pinfo.cols.protocol == "UDP" then
+        return
+    end
+
+    local dst_ip = tostring(pinfo.dst)
+    local dst_port = tostring(pinfo.dst_port)
+    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
+
+    -- Counting UDP packets
+    if not udp_tracker[key] then
+        udp_tracker[key] = 0
+    end
+
+    udp_tracker[key] = udp_tracker[key] + 1
+    -- DEBUG :print(udp_tracker[key])
+
+    -- Trigger detection
+    if udp_tracker[key] >= threshold then
+        if gui_enabled() then
+            Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
+        end
+        print("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
+
+        local subtree = tree:add(UDPFlood, buffer(), "UDP Flood Detection")
+        subtree:add(buffer(), "UDP Flood detected: " .. key)
+        subtree:add(buffer(), "UDP packet count: " .. udp_tracker[key])
+        subtree:add(buffer(), "Threshold: " .. threshold)
+    end
+
 end
 
 function IMCPFlood.dissector(buffer, pinfo, tree)
