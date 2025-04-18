@@ -55,6 +55,8 @@ function Set_threshold(new_threshold)
 end
 
 -- Menu actions
+
+-- Function for setting the threshold
 local function threshold_action()
     local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
     if handle then
@@ -78,6 +80,7 @@ local function threshold_action()
     end
 end
 
+-- Function for setting the port
 local function port_action()
     local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
     if handle then
@@ -124,7 +127,7 @@ end
 function SynFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["SYNFlood"] then return end
 
-    
+    -- Check if the packet is TCP
     local tcp_flags_field = tcp_flags_f()
     if not tcp_flags_field then return end
 
