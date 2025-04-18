@@ -14,6 +14,8 @@ local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 local threshold = 0
 local port = 80
 local ttl = 60 -- Time to live for the packets when tracking (in seconds)
+local last_alert_time = 0
+local alert_interval = 10 -- Time interval for alerting (in seconds)
 local alert_triggered = {}
 
 local dissector_states = {
@@ -32,7 +34,13 @@ local tcp_flags_f = Field.new("tcp.flags")
 
 -- Functions to create Pop-up windows
 function Create_popup(message)
-    os.execute("zenity --info --text='" .. message .. "' &")
+    local current_time = os.time()
+    if current_time - last_alert_time >= alert_interval then
+    os.execute("zenity --info --text='" .. message .. "'")
+        last_alert_time = current_time
+    else
+        print("[ALERT SKIPPED]" .. message)
+    end
 end
 
 -- Function that allows user to set port
@@ -217,7 +225,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
         if gui_enabled() then
             Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key].count .. " UDP packets)")
         end
-        print("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
+        print("UDP Flood detected: " .. key .. " (" .. udp_tracker[key].count .. " UDP packets)")
 
         local subtree = tree:add(UDPFlood, buffer(), "UDP Flood Detection")
         subtree:add(buffer(), "UDP Flood detected: " .. key)
