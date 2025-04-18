@@ -54,8 +54,24 @@ function Set_threshold(new_threshold)
     end
 end
 
--- Menu actions
+function cleanup()
+    local current_time = os.time()
 
+    local function cleanup_tracker(tracker)   
+    for key, count in pairs(tracker) do
+        if current_time - entry.timestamp > ttl then
+            tracker[key] = nil
+        end
+    end
+end
+
+-- cleaning up the trackers
+    cleanup_tracker(syn_tracker)
+    cleanup_tracker(udp_tracker)
+    cleanup_tracker(icmp_tracker)
+end
+
+-- Menu actions
 -- Function for setting the threshold
 local function threshold_action()
     local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
