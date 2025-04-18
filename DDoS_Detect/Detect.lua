@@ -175,7 +175,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
         if gui_enabled() then
             Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
         end
-        print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
+        print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
 
         local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
         subtree:add(buffer(), "SYN Flood detected: " .. key)
@@ -215,7 +215,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
     -- Trigger detection
     if udp_tracker[key].count >= threshold then
         if gui_enabled() then
-            Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
+            Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key].count .. " UDP packets)")
         end
         print("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
 
