@@ -159,7 +159,12 @@ function SynFlood.dissector(buffer, pinfo, tree)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     -- Count SYN packets
-    syn_tracker[key] = (syn_tracker[key] or 0) + 1
+    if not syn_tracker[key] then
+        syn_tracker[key] = { count = 0, timestamp = os.time() }
+    end
+    syn_tracker[key].count = syn_tracker[key].count + 1
+    syn_tracker[key].timestamp = os.time()
+    -- DEBUG :print(syn_tracker[key].count)
     -- DEBUG :print(syn_tracker[key])
 
     -- Trigger detection
@@ -174,6 +179,9 @@ function SynFlood.dissector(buffer, pinfo, tree)
         subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key])
         subtree:add(buffer(), "Threshold: " .. threshold)
     end
+
+    -- Cleanup old entries
+    cleanup()
 end
 
 -- Placeholder UDP and ICMP Flood Detection
