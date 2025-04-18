@@ -14,6 +14,7 @@ local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 local threshold = 0
 local port = 80
 local ttl = 60 -- Time to live for the packets when tracking (in seconds)
+local alert_triggered = {}
 
 local dissector_states = {
     SYNFlood = false,
@@ -31,7 +32,7 @@ local tcp_flags_f = Field.new("tcp.flags")
 
 -- Functions to create Pop-up windows
 function Create_popup(message)
-    os.execute("zenity --info --text='" .. message .. "'")
+    os.execute("zenity --info --text='" .. message .. "' &")
 end
 
 -- Function that allows user to set port
@@ -59,8 +60,10 @@ function Cleanup()
 
     local function cleanup_tracker(tracker)   
     for key, count in pairs(tracker) do
-        if current_time - entry.timestamp > ttl then
+        if current_time - count.timestamp > ttl then
             tracker[key] = nil
+            alert_triggered[key] = nil
+            print("Removed old entry: " .. key)
         end
     end
 end
@@ -178,6 +181,9 @@ function SynFlood.dissector(buffer, pinfo, tree)
         subtree:add(buffer(), "SYN Flood detected: " .. key)
         subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key])
         subtree:add(buffer(), "Threshold: " .. threshold)
+
+        -- Marks the alert as triggered for the key
+        alert_triggered[key] = true
     end
 
     -- Cleanup old entries
@@ -217,6 +223,9 @@ function UDPFlood.dissector(buffer, pinfo, tree)
         subtree:add(buffer(), "UDP Flood detected: " .. key)
         subtree:add(buffer(), "UDP packet count: " .. udp_tracker[key])
         subtree:add(buffer(), "Threshold: " .. threshold)
+
+         -- Marks the alert as triggered for the key
+         alert_triggered[key] = true
     end
 
     Cleanup()
