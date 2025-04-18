@@ -168,7 +168,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
     -- DEBUG :print(syn_tracker[key])
 
     -- Trigger detection
-    if syn_tracker[key] >= threshold then
+    if syn_tracker[key].count >= threshold then
         if gui_enabled() then
             Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
         end
@@ -207,7 +207,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
     -- DEBUG :print(udp_tracker[key])
 
     -- Trigger detection
-    if udp_tracker[key] >= threshold then
+    if udp_tracker[key].count >= threshold then
         if gui_enabled() then
             Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key] .. " UDP packets)")
         end
