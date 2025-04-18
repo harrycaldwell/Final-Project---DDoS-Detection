@@ -54,7 +54,7 @@ function Set_threshold(new_threshold)
     end
 end
 
-function cleanup()
+function Cleanup()
     local current_time = os.time()
 
     local function cleanup_tracker(tracker)   
@@ -181,7 +181,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
     end
 
     -- Cleanup old entries
-    cleanup()
+    Cleanup()
 end
 
 -- Placeholder UDP and ICMP Flood Detection
@@ -193,16 +193,17 @@ function UDPFlood.dissector(buffer, pinfo, tree)
         return
     end
 
+    local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
     local dst_port = tostring(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     -- Counting UDP packets
     if not udp_tracker[key] then
-        udp_tracker[key] = 0
+        udp_tracker[key] = {count = 0, timestamp = os.time()}
     end
-
-    udp_tracker[key] = udp_tracker[key] + 1
+    udp_tracker[key].count = udp_tracker[key].count + 1
+    udp_tracker[key].timestamp = os.time()
     -- DEBUG :print(udp_tracker[key])
 
     -- Trigger detection
@@ -218,6 +219,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
         subtree:add(buffer(), "Threshold: " .. threshold)
     end
 
+    Cleanup()
 end
 
 function IMCPFlood.dissector(buffer, pinfo, tree)
