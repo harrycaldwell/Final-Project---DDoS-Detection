@@ -190,10 +190,10 @@ function SynFlood.dissector(buffer, pinfo, tree)
 
         -- Marks the alert as triggered for the key
         alert_triggered[key] = true
-    end
 
-    -- Cleanup old entries
-    Cleanup()
+        -- Cleanup old entries
+        Cleanup()
+    end
 end
 
 -- Placeholder UDP and ICMP Flood Detection
@@ -232,9 +232,9 @@ function UDPFlood.dissector(buffer, pinfo, tree)
 
          -- Marks the alert as triggered for the key
          alert_triggered[key] = true
+        -- Cleanup old entries
+        Cleanup()
     end
-
-    Cleanup()
 end
 
 function IMCPFlood.dissector(buffer, pinfo, tree)
