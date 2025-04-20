@@ -71,7 +71,7 @@ local function track_packet(tracker, key)
 end
 
 local function detect_flood(protocol, tracker, key, src_ip, tree, buffer)
-    if tracker[key].count >= threshold then
+    if tracker[key].count == threshold then
         trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         Cleanup_tables()
     end
