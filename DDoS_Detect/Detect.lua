@@ -26,6 +26,9 @@ local syn_tracker = {}
 local udp_tracker = {}
 local icmp_tracker = {}
 
+-- Table that logs IP that have cause alerts
+local alerted_ips = {}
+
 -- Field Extractors
 local tcp_flags_f = Field.new("tcp.flags")
 
@@ -55,7 +58,7 @@ function Set_threshold(new_threshold)
     end
 end
 
-function Cleanup()
+function Cleanup_tables()
     -- Clear all entries from the trackers
     for key in pairs(syn_tracker) do
         syn_tracker[key] = nil
@@ -174,25 +177,31 @@ function SynFlood.dissector(buffer, pinfo, tree)
 
     -- Trigger detection
     if syn_tracker[key].count >= threshold then
-        if gui_enabled() then
-            if syn_tracker[key] and syn_tracker[key].count then
-                Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
-            else
-                print("ERROR: syn_tracker[" .. key .. "] or syn_tracker[" .. key .. "].count is nil")
+
+        -- Adding IP to alerted IPs table
+        if not alerted_ips[src_ip] then
+            alerted_ips[src_ip] = true
+            print("IP " .. src_ip .. " has triggered an alert and is now logged.")
+
+            if gui_enabled() then
+                if syn_tracker[key] and syn_tracker[key].count then
+                    Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
+                else
+                    print("ERROR: syn_tracker[" .. key .. "] or syn_tracker[" .. key .. "].count is nil")
+                end
             end
+            print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
+
+            local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
+            subtree:add(buffer(), "SYN Flood detected: " .. key)
+            subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key].count)
+            subtree:add(buffer(), "Threshold: " .. threshold)
+
+            -- Marks the alert as triggered for the key
+            alert_triggered[key] = true
         end
-        print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
-
-        local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
-        subtree:add(buffer(), "SYN Flood detected: " .. key)
-        subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key].count)
-        subtree:add(buffer(), "Threshold: " .. threshold)
-
-        -- Marks the alert as triggered for the key
-        alert_triggered[key] = true
-
         -- Cleanup old entries
-        Cleanup()
+        Cleanup_tables()
     end
 end
 
