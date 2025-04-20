@@ -13,9 +13,6 @@ local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 -- Variable Declarations
 local threshold = 0
 local port = 80
-local ttl = 60 -- Time to live for the packets when tracking (in seconds)
-local last_alert_time = 0
-local alert_interval = 10 -- Time interval for alerting (in seconds)
 local alert_triggered = {}
 
 local dissector_states = {
@@ -34,13 +31,8 @@ local tcp_flags_f = Field.new("tcp.flags")
 
 -- Functions to create Pop-up windows
 function Create_popup(message)
-    local current_time = os.time()
-    if current_time - last_alert_time >= alert_interval then
     os.execute("zenity --info --text='" .. message .. "'")
         last_alert_time = current_time
-    else
-        print("[ALERT SKIPPED]" .. message)
-    end
 end
 
 -- Function that allows user to set port
@@ -64,22 +56,23 @@ function Set_threshold(new_threshold)
 end
 
 function Cleanup()
-    local current_time = os.time()
-
-    local function cleanup_tracker(tracker)   
-    for key, count in pairs(tracker) do
-        if current_time - count.timestamp > ttl then
-            tracker[key] = nil
-            alert_triggered[key] = nil
-            print("Removed old entry: " .. key)
-        end
+    -- Clear all entries from the trackers
+    for key in pairs(syn_tracker) do
+        syn_tracker[key] = nil
     end
-end
+    for key in pairs(udp_tracker) do
+        udp_tracker[key] = nil
+    end
+    for key in pairs(icmp_tracker) do
+        icmp_tracker[key] = nil
+    end
 
--- cleaning up the trackers
-    cleanup_tracker(syn_tracker)
-    cleanup_tracker(udp_tracker)
-    cleanup_tracker(icmp_tracker)
+    -- Clear all entries from the alert_triggered table
+    for key in pairs(alert_triggered) do
+        alert_triggered[key] = nil
+    end
+
+    print("All trackers and alerts have been cleared.")
 end
 
 -- Menu actions
@@ -177,7 +170,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
     syn_tracker[key].timestamp = os.time()
 
     -- Debugging
-    print("DEBUG: syn_tracker[" .. key .. "] = " .. tostring(syn_tracker[key]))
+    --print("DEBUG: syn_tracker[" .. key .. "] = " .. tostring(syn_tracker[key]))
 
     -- Trigger detection
     if syn_tracker[key].count >= threshold then
