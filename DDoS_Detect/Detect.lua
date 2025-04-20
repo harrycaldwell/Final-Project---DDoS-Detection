@@ -7,9 +7,9 @@ local plugin_info = {
 }
 
 -- Proto Declarations
-local SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
-local UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
-local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
+SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
+UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
+IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 
 -- Configuration
 local config = {
@@ -207,12 +207,12 @@ end
 
 -- Register Dissectors
 local function register_dissector(proto_name)
-    local success = pcall(function()
+    local success, err = pcall(function()
         register_postdissector(_G[proto_name])
         print(proto_name .. " dissector registered successfully")
     end)
     if not success then
-        print("Failed to register " .. proto_name .. " dissector")
+        print("Failed to register " .. proto_name .. " dissector: " .. err)
     end
 end
 
