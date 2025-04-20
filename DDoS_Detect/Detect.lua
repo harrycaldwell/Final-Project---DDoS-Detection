@@ -1,3 +1,4 @@
+-- Plugin Information
 local plugin_info = {
     version = "1.0.0",
     description = "DDoS Detector Plugin",
@@ -10,35 +11,87 @@ local SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
 local UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
 local IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 
--- Variable Declarations
-local threshold = 0
-local port = 80
-local alert_triggered = {}
+-- Configuration
+local config = {
+    default_threshold = 100, -- Default threshold for flood detection
+    default_port = 80,       -- Default port to monitor
+}
 
+-- State Variables
+local threshold = config.default_threshold
+local port = config.default_port
+local alert_triggered = {}
 local dissector_states = {
     SYNFlood = false,
     UDPFlood = false,
     IMCPFlood = false
 }
 
--- Tables for tracking packets
+-- Packet Trackers
 local syn_tracker = {}
 local udp_tracker = {}
 local icmp_tracker = {}
-
--- Table that logs IP that have cause alerts
 local alerted_ips = {}
 
 -- Field Extractors
 local tcp_flags_f = Field.new("tcp.flags")
 
--- Functions to create Pop-up windows
-function Create_popup(message)
-    os.execute("zenity --info --text='" .. message .. "'")
-        last_alert_time = current_time
+-- Utility Functions
+local function log_alert(protocol, key, count, tree, buffer)
+    print(protocol .. " Flood detected: " .. key .. " (" .. count .. " packets)")
+    local subtree = tree:add(_G[protocol], buffer(), protocol .. " Flood Detection")
+    subtree:add(buffer(), protocol .. " Flood detected: " .. key)
+    subtree:add(buffer(), protocol .. " packet count: " .. count)
+    subtree:add(buffer(), "Threshold: " .. threshold)
 end
 
--- Function that allows user to set port
+local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
+    if not alerted_ips[src_ip] then
+        print("IP " .. src_ip .. " has triggered an alert and is now logged.")
+        if gui_enabled() then
+            Create_popup(protocol .. " Flood detected: " .. key .. " (" .. tracker[key].count .. " packets)")
+        end
+        log_alert(protocol, key, tracker[key].count, tree, buffer)
+        alerted_ips[src_ip] = true
+        alert_triggered[key] = true
+    end
+end
+
+local function track_packet(tracker, key)
+    if not tracker[key] then
+        tracker[key] = { count = 0, timestamp = os.time() }
+    end
+    tracker[key].count = tracker[key].count + 1
+    tracker[key].timestamp = os.time()
+end
+
+local function detect_flood(protocol, tracker, key, src_ip, tree, buffer)
+    if tracker[key].count >= threshold then
+        trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
+        Cleanup_tables()
+    end
+end
+
+-- Cleanup Function
+function Cleanup_tables()
+    local trackers = { syn_tracker, udp_tracker, icmp_tracker }
+    for _, tracker in ipairs(trackers) do
+        for key in pairs(tracker) do
+            tracker[key] = nil
+        end
+    end
+    for key in pairs(alert_triggered) do
+        alert_triggered[key] = nil
+    end
+    print("All trackers and alerts have been cleared.")
+end
+
+-- GUI Helper Function
+function Create_popup(message)
+    os.execute("zenity --info --text='" .. message .. "'")
+end
+
+-- User Configuration Functions
 function Set_port(new_port)
     if type(new_port) == "number" and new_port >= 0 then
         port = new_port
@@ -48,7 +101,6 @@ function Set_port(new_port)
     end
 end
 
--- Function to set the threshold value
 function Set_threshold(new_threshold)
     if type(new_threshold) == "number" and new_threshold >= 0 then
         threshold = new_threshold
@@ -58,28 +110,7 @@ function Set_threshold(new_threshold)
     end
 end
 
-function Cleanup_tables()
-    -- Clear all entries from the trackers
-    for key in pairs(syn_tracker) do
-        syn_tracker[key] = nil
-    end
-    for key in pairs(udp_tracker) do
-        udp_tracker[key] = nil
-    end
-    for key in pairs(icmp_tracker) do
-        icmp_tracker[key] = nil
-    end
-
-    -- Clear all entries from the alert_triggered table
-    for key in pairs(alert_triggered) do
-        alert_triggered[key] = nil
-    end
-
-    print("All trackers and alerts have been cleared.")
-end
-
--- Menu actions
--- Function for setting the threshold
+-- Menu Actions
 local function threshold_action()
     local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
     if handle then
@@ -103,7 +134,6 @@ local function threshold_action()
     end
 end
 
--- Function for setting the port
 local function port_action()
     local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
     if handle then
@@ -127,7 +157,6 @@ local function port_action()
     end
 end
 
--- Function to enable/disable the dissectors
 function toggle_dissector(dissector_name)
     if dissector_states[dissector_name] ~= nil then
         dissector_states[dissector_name] = not dissector_states[dissector_name]
@@ -137,142 +166,68 @@ function toggle_dissector(dissector_name)
     end
 end
 
--- GUI Menu register
-if gui_enabled() then
-    register_menu("DDoS Detection/Settings/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Settings/Set Port", port_action, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Detection/SYN Flood/Enable-Disable", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Detection/UDP Flood/Enable-Disable", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Detection/ICMP Flood/Enable-Disable", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
-end
-
 -- SYN Flood Detection
 function SynFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["SYNFlood"] then return end
 
-    -- Check if the packet is TCP
     local tcp_flags_field = tcp_flags_f()
     if not tcp_flags_field then return end
 
     local tcp_flags = tonumber(tostring(tcp_flags_field))
-    if bit.band(tcp_flags, 0x02) == 0 then
-        return -- Skip if SYN flag is not set
-    end
+    if bit.band(tcp_flags, 0x02) == 0 then return end -- Skip if SYN flag is not set
 
-    -- Extract IP and port
     local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
     local dst_port = tostring(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
-    -- Count SYN packets
-    if not syn_tracker[key] then
-        syn_tracker[key] = { count = 0, timestamp = os.time() }
-    end
-    syn_tracker[key].count = syn_tracker[key].count + 1
-    syn_tracker[key].timestamp = os.time()
-
-    -- Debugging
-    --print("DEBUG: syn_tracker[" .. key .. "] = " .. tostring(syn_tracker[key]))
-
-    -- Trigger detection
-    if syn_tracker[key].count >= threshold then
-
-        -- Adding IP to alerted IPs table
-        if not alerted_ips[src_ip] then -- If the IP is not already logged
-            print("IP " .. src_ip .. " has triggered an alert and is now logged.")
-
-            if gui_enabled() then --If GUI is enabled
-                if syn_tracker[key] then --If syn_tracker[key] is not nil
-                    Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
-                else
-                    print("ERROR: syn_tracker[" .. key .. "] or syn_tracker[" .. key .. "].count is nil")
-                end
-            end
-            print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
-
-            local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
-            -- Adding details to the subtree
-            subtree:add(buffer(), "SYN Flood detected: " .. key)
-            subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key].count)
-            subtree:add(buffer(), "Threshold: " .. threshold)
-            alerted_ips[src_ip] = true
-
-            -- Marks the alert as triggered for the key
-            alert_triggered[key] = true
-        end
-        -- Cleanup old entries
-        Cleanup_tables()
-    end
+    track_packet(syn_tracker, key)
+    detect_flood("SYNFlood", syn_tracker, key, src_ip, tree, buffer)
 end
 
--- Placeholder UDP and ICMP Flood Detection
+-- UDP Flood Detection
 function UDPFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["UDPFlood"] then return end
-    -- Add UDP flood detection logic here
-    
-    if not pinfo.cols.protocol or pinfo.cols.protocol == "UDP" then
-        return
-    end
+    if not pinfo.cols.protocol or pinfo.cols.protocol ~= "UDP" then return end
 
     local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
     local dst_port = tostring(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
-    -- Counting UDP packets
-    if not udp_tracker[key] then
-        udp_tracker[key] = {count = 0, timestamp = os.time()}
-    end
-    udp_tracker[key].count = udp_tracker[key].count + 1
-    udp_tracker[key].timestamp = os.time()
-    -- DEBUG :print(udp_tracker[key])
-
-    -- Trigger detection
-    if udp_tracker[key].count >= threshold then
-        if gui_enabled() then
-            Create_popup("UDP Flood detected: " .. key .. " (" .. udp_tracker[key].count .. " UDP packets)")
-        end
-        print("UDP Flood detected: " .. key .. " (" .. udp_tracker[key].count .. " UDP packets)")
-
-        local subtree = tree:add(UDPFlood, buffer(), "UDP Flood Detection")
-        subtree:add(buffer(), "UDP Flood detected: " .. key)
-        subtree:add(buffer(), "UDP packet count: " .. udp_tracker[key].count)
-        subtree:add(buffer(), "Threshold: " .. threshold)
-
-         -- Marks the alert as triggered for the key
-         alert_triggered[key] = true
-        -- Cleanup old entries
-        Cleanup()
-    end
+    track_packet(udp_tracker, key)
+    detect_flood("UDPFlood", udp_tracker, key, src_ip, tree, buffer)
 end
 
+-- ICMP Flood Detection (Placeholder)
 function IMCPFlood.dissector(buffer, pinfo, tree)
     if not dissector_states["IMCPFlood"] then return end
     -- Add ICMP flood detection logic here
 end
 
--- Registering of the dissectors
-local success = pcall(function()
-    register_postdissector(SynFlood)
-    print("SYN Flood dissector registered successfully")
-end)
-if not success then
-    print("Failed to register SYN Flood dissector")
+-- Register Dissectors
+local function register_dissector(proto_name)
+    local success = pcall(function()
+        register_postdissector(_G[proto_name])
+        print(proto_name .. " dissector registered successfully")
+    end)
+    if not success then
+        print("Failed to register " .. proto_name .. " dissector")
+    end
 end
 
-success = pcall(function()
-    register_postdissector(UDPFlood)
-    print("UDP Flood dissector registered successfully")
-end)
-if not success then
-    print("Failed to register UDP Flood dissector")
+register_dissector("SynFlood")
+register_dissector("UDPFlood")
+register_dissector("IMCPFlood")
+
+-- GUI Menu Registration
+local function register_menu_actions()
+    register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Toggle SYN Flood Detection", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Toggle UDP Flood Detection", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Toggle ICMP Flood Detection", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
 end
 
-success = pcall(function()
-    register_postdissector(IMCPFlood)
-    print("ICMP Flood dissector registered successfully")
-end)
-if not success then
-    print("Failed to register ICMP Flood dissector")
-end
+-- Register GUI Menu Actions
+register_menu_actions()
