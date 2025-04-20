@@ -179,12 +179,11 @@ function SynFlood.dissector(buffer, pinfo, tree)
     if syn_tracker[key].count >= threshold then
 
         -- Adding IP to alerted IPs table
-        if not alerted_ips[src_ip] then
-            alerted_ips[src_ip] = true
+        if not alerted_ips[src_ip] then -- If the IP is not already logged
             print("IP " .. src_ip .. " has triggered an alert and is now logged.")
 
-            if gui_enabled() then
-                if syn_tracker[key] and syn_tracker[key].count then
+            if gui_enabled() then --If GUI is enabled
+                if syn_tracker[key] then --If syn_tracker[key] is not nil
                     Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
                 else
                     print("ERROR: syn_tracker[" .. key .. "] or syn_tracker[" .. key .. "].count is nil")
@@ -193,9 +192,11 @@ function SynFlood.dissector(buffer, pinfo, tree)
             print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
 
             local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
+            -- Adding details to the subtree
             subtree:add(buffer(), "SYN Flood detected: " .. key)
             subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key].count)
             subtree:add(buffer(), "Threshold: " .. threshold)
+            alerted_ips[src_ip] = true
 
             -- Marks the alert as triggered for the key
             alert_triggered[key] = true
