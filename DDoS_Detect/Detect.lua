@@ -11,6 +11,11 @@ SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
 UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
 IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
 
+-- Make Proto objects globally accessible
+_G["SynFlood"] = SynFlood
+_G["UDPFlood"] = UDPFlood
+_G["IMCPFlood"] = IMCPFlood
+
 -- Configuration
 local config = {
     default_threshold = 100, -- Default threshold for flood detection
@@ -208,6 +213,9 @@ end
 -- Register Dissectors
 local function register_dissector(proto_name)
     local success, err = pcall(function()
+        if not _G[proto_name] then
+            error("Proto object '" .. proto_name .. "' is not defined or not globally accessible.")
+        end
         register_postdissector(_G[proto_name])
         print(proto_name .. " dissector registered successfully")
     end)
@@ -216,6 +224,7 @@ local function register_dissector(proto_name)
     end
 end
 
+-- Registering Dissectors
 register_dissector("SynFlood")
 register_dissector("UDPFlood")
 register_dissector("IMCPFlood")
