@@ -203,6 +203,25 @@ function SynFlood.dissector(buffer, pinfo, tree)
         end
         -- Cleanup old entries
         Cleanup_tables()
+=======
+    -- DEBUG :print(syn_tracker[key].count)
+    -- DEBUG :print(syn_tracker[key])
+
+    -- Trigger detection
+    if syn_tracker[key].count >= threshold then
+        if gui_enabled() then
+            Create_popup("SYN Flood detected: " .. key .. " (" .. syn_tracker[key] .. " SYN packets)")
+        end
+        print("SYN Flood detected: " .. key .. " (" .. syn_tracker[key].count .. " SYN packets)")
+
+        local subtree = tree:add(SynFlood, buffer(), "SYN Flood Detection")
+        subtree:add(buffer(), "SYN Flood detected: " .. key)
+        subtree:add(buffer(), "SYN packet count: " .. syn_tracker[key])
+        subtree:add(buffer(), "Threshold: " .. threshold)
+
+        -- Marks the alert as triggered for the key
+        alert_triggered[key] = true
+>>>>>>> parent of c98ba79 (trying to fix error)
     end
 end
 
@@ -237,7 +256,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
 
         local subtree = tree:add(UDPFlood, buffer(), "UDP Flood Detection")
         subtree:add(buffer(), "UDP Flood detected: " .. key)
-        subtree:add(buffer(), "UDP packet count: " .. udp_tracker[key].count)
+        subtree:add(buffer(), "UDP packet count: " .. udp_tracker[key])
         subtree:add(buffer(), "Threshold: " .. threshold)
 
          -- Marks the alert as triggered for the key
