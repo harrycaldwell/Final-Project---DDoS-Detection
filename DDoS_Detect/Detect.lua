@@ -19,11 +19,13 @@ _G["IMCPFlood"] = IMCPFlood
 -- Configuration
 local config = {
     default_threshold = 100, -- Default threshold for flood detection
+    default_rate_threshold = 50, -- Default packets per second threshold
     default_port = 80,       -- Default port to monitor
 }
 
 -- State Variables
 local threshold = config.default_threshold
+local rate_threshold = config.default_rate_threshold
 local port = config.default_port
 local alert_triggered = {}
 local dissector_states = {
@@ -36,6 +38,7 @@ local dissector_states = {
 local syn_tracker = {}
 local udp_tracker = {}
 local icmp_tracker = {}
+local packet_rate_tracker = {}
 local alerted_ips = {}
 
 -- Field Extractors
@@ -70,8 +73,35 @@ local function track_packet(tracker, key)
     tracker[key].timestamp = os.time()
 end
 
+local function track_packet_rate(tracker, key)
+    local current_time = os.time()
+
+    -- Initialize tracker for the key if it doesn't exist
+    if not tracker[key] then
+        tracker[key] = { timestamps = {}, count = 0 }
+    end
+
+    -- Add the current timestamp to the list
+    table.insert(tracker[key].timestamps, current_time)
+    tracker[key].count = tracker[key].count + 1
+
+    -- Remove timestamps older than 1 second
+    while #tracker[key].timestamps > 0 and current_time - tracker[key].timestamps[1] > 1 do
+        table.remove(tracker[key].timestamps, 1)
+    end
+
+    -- Calculate the packet rate
+    local packet_rate = #tracker[key].timestamps
+
+    -- Check if the rate exceeds the threshold
+    if packet_rate >= rate_threshold then
+        print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
+        trigger_alert("HighRate", key, tracker, key, nil, nil) -- Trigger alert
+    end
+end
+
 local function detect_flood(protocol, tracker, key, src_ip, tree, buffer)
-    if tracker[key].count == threshold then
+    if tracker[key].count >= threshold then
         trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         Cleanup_tables()
     end
@@ -79,7 +109,7 @@ end
 
 -- Cleanup Function
 function Cleanup_tables()
-    local trackers = { syn_tracker, udp_tracker, icmp_tracker }
+    local trackers = { syn_tracker, udp_tracker, icmp_tracker, packet_rate_tracker }
     for _, tracker in ipairs(trackers) do
         for key in pairs(tracker) do
             tracker[key] = nil
@@ -112,6 +142,15 @@ function Set_threshold(new_threshold)
         print("Threshold set to: " .. threshold)
     else
         print("Invalid Threshold Value. Please use a non-negative number.")
+    end
+end
+
+function Set_rate_threshold(new_rate_threshold)
+    if type(new_rate_threshold) == "number" and new_rate_threshold >= 0 then
+        rate_threshold = new_rate_threshold
+        print("Rate threshold set to: " .. rate_threshold)
+    else
+        print("Invalid Rate Threshold Value. Please use a non-negative number.")
     end
 end
 
@@ -187,6 +226,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     track_packet(syn_tracker, key)
+    track_packet_rate(packet_rate_tracker, key)
     detect_flood("SYNFlood", syn_tracker, key, src_ip, tree, buffer)
 end
 
@@ -201,6 +241,7 @@ function UDPFlood.dissector(buffer, pinfo, tree)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     track_packet(udp_tracker, key)
+    track_packet_rate(packet_rate_tracker, key)
     detect_flood("UDPFlood", udp_tracker, key, src_ip, tree, buffer)
 end
 
@@ -232,6 +273,28 @@ register_dissector("IMCPFlood")
 -- GUI Menu Registration
 local function register_menu_actions()
     register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Set Rate Threshold", function()
+        local handle = io.popen("zenity --entry --title='Set Rate Threshold' --text='Enter the rate threshold (packets/second):'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("Rate threshold update canceled.")
+                return
+            end
+
+            local new_rate_threshold = tonumber(input)
+            if new_rate_threshold then
+                Set_rate_threshold(new_rate_threshold)
+            else
+                Create_popup("Invalid Rate Threshold Value. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Toggle SYN Flood Detection", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Toggle UDP Flood Detection", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
