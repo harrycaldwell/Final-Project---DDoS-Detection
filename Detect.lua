@@ -35,10 +35,12 @@ local dissector_states = {
 }
 
 -- Packet Trackers
-local syn_tracker = {}
-local udp_tracker = {}
-local icmp_tracker = {}
-local packet_rate_tracker = {}
+local trackers = {
+    SYNFlood = {},
+    UDPFlood = {},
+    IMCPFlood = {},
+    packet_rate = {}
+}
 local alerted_ips = {}
 
 -- Field Extractors
@@ -73,7 +75,7 @@ local function track_packet(tracker, key)
     tracker[key].timestamp = os.time()
 end
 
-local function track_packet_rate(tracker, key)
+local function track_packet_rate(tracker, key, rate_threshold)
     local current_time = os.time()
 
     -- Initialize tracker for the key if it doesn't exist
@@ -100,17 +102,54 @@ local function track_packet_rate(tracker, key)
     end
 end
 
-local function detect_flood(protocol, tracker, key, src_ip, tree, buffer)
+local function detect_flood(protocol, tracker, key, src_ip, tree, buffer, rate_threshold)
+    track_packet(tracker, key)
+    track_packet_rate(trackers.packet_rate, key, rate_threshold)
     if tracker[key].count >= threshold then
         trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
-        Cleanup_tables()
     end
+end
+
+-- Reusable Dissector Function
+local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_threshold, filter_function)
+    if not dissector_states[protocol] then return end
+    if filter_function and not filter_function(pinfo) then return end
+
+    local src_ip = tostring(pinfo.src)
+    local dst_ip = tostring(pinfo.dst)
+    local dst_port = tostring(pinfo.dst_port)
+    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
+
+    detect_flood(protocol, tracker, key, src_ip, tree, buffer, rate_threshold)
+end
+
+-- SYN Flood Detection
+function SynFlood.dissector(buffer, pinfo, tree)
+    generic_dissector("SYNFlood", trackers.SYNFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+        local tcp_flags_field = tcp_flags_f()
+        if not tcp_flags_field then return false end
+        local tcp_flags = tonumber(tostring(tcp_flags_field))
+        return bit.band(tcp_flags, 0x02) ~= 0 -- Only process packets with the SYN flag set
+    end)
+end
+
+-- UDP Flood Detection
+function UDPFlood.dissector(buffer, pinfo, tree)
+    generic_dissector("UDPFlood", trackers.UDPFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+        return pinfo.cols.protocol == "UDP"
+    end)
+end
+
+-- ICMP Flood Detection
+function IMCPFlood.dissector(buffer, pinfo, tree)
+    generic_dissector("IMCPFlood", trackers.IMCPFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+        return pinfo.cols.protocol == "ICMP"
+    end)
 end
 
 -- Cleanup Function
 function Cleanup_tables()
-    local trackers = { syn_tracker, udp_tracker, icmp_tracker, packet_rate_tracker }
-    for _, tracker in ipairs(trackers) do
+    for _, tracker in pairs(trackers) do
         for key in pairs(tracker) do
             tracker[key] = nil
         end
@@ -154,103 +193,6 @@ function Set_rate_threshold(new_rate_threshold)
     end
 end
 
--- Menu Actions
-local function threshold_action()
-    local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
-    if handle then
-        local input = handle:read("*a")
-        handle:close()
-        input = input and input:match("^%s*(.-)%s*$") or ""
-
-        if input == "" then
-            Create_popup("Threshold update canceled.")
-            return
-        end
-
-        local new_threshold = tonumber(input)
-        if new_threshold then
-            Set_threshold(new_threshold)
-        else
-            Create_popup("Invalid Threshold Value. Please use a non-negative number.")
-        end
-    else
-        Create_popup("Failed to open input prompt.")
-    end
-end
-
-local function port_action()
-    local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
-    if handle then
-        local input = handle:read("*a")
-        handle:close()
-        input = input and input:match("^%s*(.-)%s*$") or ""
-
-        if input == "" then
-            Create_popup("Port update canceled.")
-            return
-        end
-
-        local new_port = tonumber(input)
-        if new_port then
-            Set_port(new_port)
-        else
-            Create_popup("Invalid Port Number. Please use a non-negative number.")
-        end
-    else
-        Create_popup("Failed to open input prompt.")
-    end
-end
-
-function toggle_dissector(dissector_name)
-    if dissector_states[dissector_name] ~= nil then
-        dissector_states[dissector_name] = not dissector_states[dissector_name]
-        print(dissector_name .. " is now " .. (dissector_states[dissector_name] and "enabled" or "disabled"))
-    else
-        print("Invalid dissector name: " .. dissector_name)
-    end
-end
-
--- SYN Flood Detection
-function SynFlood.dissector(buffer, pinfo, tree)
-    if not dissector_states["SYNFlood"] then return end
-
-    local tcp_flags_field = tcp_flags_f()
-    if not tcp_flags_field then return end
-
-    local tcp_flags = tonumber(tostring(tcp_flags_field))
-    if bit.band(tcp_flags, 0x02) == 0 then return end -- Skip if SYN flag is not set
-
-    local src_ip = tostring(pinfo.src)
-    local dst_ip = tostring(pinfo.dst)
-    local dst_port = tostring(pinfo.dst_port)
-    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
-
-    track_packet(syn_tracker, key)
-    track_packet_rate(packet_rate_tracker, key)
-    detect_flood("SYNFlood", syn_tracker, key, src_ip, tree, buffer)
-end
-
--- UDP Flood Detection
-function UDPFlood.dissector(buffer, pinfo, tree)
-    if not dissector_states["UDPFlood"] then return end
-    if not pinfo.cols.protocol or pinfo.cols.protocol ~= "UDP" then return end
-
-    local src_ip = tostring(pinfo.src)
-    local dst_ip = tostring(pinfo.dst)
-    local dst_port = tostring(pinfo.dst_port)
-    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
-
-    track_packet(udp_tracker, key)
-    track_packet_rate(packet_rate_tracker, key)
-    detect_flood("UDPFlood", udp_tracker, key, src_ip, tree, buffer)
-end
-
--- ICMP Flood Detection (Placeholder)
-function IMCPFlood.dissector(buffer, pinfo, tree)
-    if not dissector_states["IMCPFlood"] then return end
-    -- Add ICMP flood detection logic here
-end
-
 -- Register Dissectors
 local function register_dissector(proto_name)
     local success, err = pcall(function()
@@ -272,7 +214,29 @@ register_dissector("IMCPFlood")
 
 -- GUI Menu Registration
 local function register_menu_actions()
-    register_menu("DDoS Detection/Set Threshold", threshold_action, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/Set Threshold", function()
+        local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("Threshold update canceled.")
+                return
+            end
+
+            local new_threshold = tonumber(input)
+            if new_threshold then
+                Set_threshold(new_threshold)
+            else
+                Create_popup("Invalid Threshold Value. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
+
     register_menu("DDoS Detection/Set Rate Threshold", function()
         local handle = io.popen("zenity --entry --title='Set Rate Threshold' --text='Enter the rate threshold (packets/second):'")
         if handle then
@@ -295,7 +259,30 @@ local function register_menu_actions()
             Create_popup("Failed to open input prompt.")
         end
     end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Set Port", port_action, MENU_TOOLS_UNSORTED)
+
+    register_menu("DDoS Detection/Set Port", function()
+        local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("Port update canceled.")
+                return
+            end
+
+            local new_port = tonumber(input)
+            if new_port then
+                Set_port(new_port)
+            else
+                Create_popup("Invalid Port Number. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
+
     register_menu("DDoS Detection/Toggle SYN Flood Detection", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Toggle UDP Flood Detection", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/Toggle ICMP Flood Detection", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
