@@ -34,6 +34,10 @@ local dissector_states = {
     IMCPFlood = false
 }
 
+local syn_rate_threshold = 10000 -- Packets per second for SYN flood detection
+local udp_rate_threshold = 1000 -- Packets per second for UDP flood detection
+local icmp_rate_threshold = 200 -- Packets per second for ICMP flood detection
+
 -- Packet Trackers
 local trackers = {
     SYNFlood = {},
@@ -87,6 +91,8 @@ local function track_packet_rate(tracker, key, rate_threshold)
     table.insert(tracker[key].timestamps, current_time)
     tracker[key].count = tracker[key].count + 1
 
+    print("Current packet rate for " .. key .. ": " .. #tracker[key].timestamps .. " packets/second")
+
     -- Remove timestamps older than 1 second
     while #tracker[key].timestamps > 0 and current_time - tracker[key].timestamps[1] > 1 do
         table.remove(tracker[key].timestamps, 1)
@@ -125,7 +131,7 @@ end
 
 -- SYN Flood Detection
 function SynFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("SYNFlood", trackers.SYNFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+    generic_dissector("SYNFlood", trackers.SYNFlood, pinfo, tree, buffer, syn_rate_threshold, function(pinfo)
         local tcp_flags_field = tcp_flags_f()
         if not tcp_flags_field then return false end
         local tcp_flags = tonumber(tostring(tcp_flags_field))
@@ -135,14 +141,14 @@ end
 
 -- UDP Flood Detection
 function UDPFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("UDPFlood", trackers.UDPFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+    generic_dissector("UDPFlood", trackers.UDPFlood, pinfo, tree, buffer, udp_rate_threshold, function(pinfo)
         return pinfo.cols.protocol == "UDP"
     end)
 end
 
 -- ICMP Flood Detection
 function IMCPFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("IMCPFlood", trackers.IMCPFlood, pinfo, tree, buffer, rate_threshold, function(pinfo)
+    generic_dissector("IMCPFlood", trackers.IMCPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
         return pinfo.cols.protocol == "ICMP"
     end)
 end
@@ -214,52 +220,6 @@ register_dissector("IMCPFlood")
 
 -- GUI Menu Registration
 local function register_menu_actions()
-    register_menu("DDoS Detection/Set Threshold", function()
-        local handle = io.popen("zenity --entry --title='Set Threshold' --text='Enter the threshold value:'")
-        if handle then
-            local input = handle:read("*a")
-            handle:close()
-            input = input and input:match("^%s*(.-)%s*$") or ""
-
-            if input == "" then
-                Create_popup("Threshold update canceled.")
-                return
-            end
-
-            local new_threshold = tonumber(input)
-            if new_threshold then
-                Set_threshold(new_threshold)
-            else
-                Create_popup("Invalid Threshold Value. Please use a non-negative number.")
-            end
-        else
-            Create_popup("Failed to open input prompt.")
-        end
-    end, MENU_TOOLS_UNSORTED)
-
-    register_menu("DDoS Detection/Set Rate Threshold", function()
-        local handle = io.popen("zenity --entry --title='Set Rate Threshold' --text='Enter the rate threshold (packets/second):'")
-        if handle then
-            local input = handle:read("*a")
-            handle:close()
-            input = input and input:match("^%s*(.-)%s*$") or ""
-
-            if input == "" then
-                Create_popup("Rate threshold update canceled.")
-                return
-            end
-
-            local new_rate_threshold = tonumber(input)
-            if new_rate_threshold then
-                Set_rate_threshold(new_rate_threshold)
-            else
-                Create_popup("Invalid Rate Threshold Value. Please use a non-negative number.")
-            end
-        else
-            Create_popup("Failed to open input prompt.")
-        end
-    end, MENU_TOOLS_UNSORTED)
-
     register_menu("DDoS Detection/Set Port", function()
         local handle = io.popen("zenity --entry --title='Set Port' --text='Enter the port number:'")
         if handle then
@@ -283,9 +243,79 @@ local function register_menu_actions()
         end
     end, MENU_TOOLS_UNSORTED)
 
-    register_menu("DDoS Detection/Toggle SYN Flood Detection", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Toggle UDP Flood Detection", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/Toggle ICMP Flood Detection", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/SYN Flood/Toggle", function() toggledissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/SYN Flood/Set Rate Threshold", function()
+        local handle = io.popen("zenity --entry --title='Set SYN Rate Threshold' --text='Enter the rate threshold (packets/second):'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("SYN rate threshold update canceled.")
+                return
+            end
+
+            local new_rate_threshold = tonumber(input)
+            if new_rate_threshold then
+                syn_rate_threshold = new_rate_threshold
+                print("SYN rate threshold set to: " .. syn_rate_threshold)
+            else
+                Create_popup("Invalid SYN Rate Threshold Value. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/UDP Flood/Toggle", function() toggledissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/UDP Flood/Set Rate Threshold", function()
+        local handle = io.popen("zenity --entry --title='Set UDP Rate Threshold' --text='Enter the rate threshold (packets/second):'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("UDP rate threshold update canceled.")
+                return
+            end
+
+            local new_rate_threshold = tonumber(input)
+            if new_rate_threshold then
+                udp_rate_threshold = new_rate_threshold
+                print("UDP rate threshold set to: " .. udp_rate_threshold)
+            else
+                Create_popup("Invalid UDP Rate Threshold Value. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/ICMP Flood/Toggle", function() toggledissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/ICMP Flood/Set Rate Threshold", function()
+        local handle = io.popen("zenity --entry --title='Set ICMP Rate Threshold' --text='Enter the rate threshold (packets/second):'")
+        if handle then
+            local input = handle:read("*a")
+            handle:close()
+            input = input and input:match("^%s*(.-)%s*$") or ""
+
+            if input == "" then
+                Create_popup("ICMP rate threshold update canceled.")
+                return
+            end
+
+            local new_rate_threshold = tonumber(input)
+            if new_rate_threshold then
+                icmp_rate_threshold = new_rate_threshold
+                print("ICMP rate threshold set to: " .. icmp_rate_threshold)
+            else
+                Create_popup("Invalid ICMP Rate Threshold Value. Please use a non-negative number.")
+            end
+        else
+            Create_popup("Failed to open input prompt.")
+        end
+    end, MENU_TOOLS_UNSORTED)
+
 end
 
 -- Register GUI Menu Actions
