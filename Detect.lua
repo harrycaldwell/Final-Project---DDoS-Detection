@@ -49,7 +49,7 @@ local alerted_ips = {}
 local tcp_flags_f = Field.new("tcp.flags")
 
 -- Cleanup Function
-local function cleanup_tables()
+function cleanup_tables()
     -- Clear all trackers
     print("calling cleanup")
     for tracker_name, tracker in pairs(trackers) do
@@ -90,8 +90,9 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         log_alert(protocol, key, tracker[key].count, tree, buffer)
         alerted_ips[src_ip] = true
         alert_triggered[key] = true
+
     end
-    cleanup_tables() -- Clear trackers and alerts after logging
+    cleanup_tables() -- Call cleanup_tables after triggering an alert
 end
 
 local function track_packet(tracker, key)
@@ -244,7 +245,6 @@ local function register_menu_actions()
             local input = handle:read("*a")
             handle:close()
             input = input and input:match("^%s*(.-)%s*$") or ""
-
             if input == "" then
                 Create_popup("Port update canceled.")
                 return
