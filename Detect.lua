@@ -108,6 +108,15 @@ local function track_packet_rate(tracker, key, rate_threshold)
     end
 end
 
+local function toggle_dissector(dissector_name)
+    if dissector_states[dissector_name] ~= nil then
+        dissector_states[dissector_name] = not dissector_states[dissector_name]
+        print(dissector_name .. " is now " .. (dissector_states[dissector_name] and "enabled" or "disabled"))
+    else
+        print("Invalid dissector name: " .. dissector_name)
+    end
+end
+
 local function detect_flood(protocol, tracker, key, src_ip, tree, buffer, rate_threshold)
     track_packet(tracker, key)
     track_packet_rate(trackers.packet_rate, key, rate_threshold)
@@ -243,7 +252,7 @@ local function register_menu_actions()
         end
     end, MENU_TOOLS_UNSORTED)
 
-    register_menu("DDoS Detection/SYN Flood/Toggle", function() toggledissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/SYN Flood/Toggle", function() toggle_dissector("SYNFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/SYN Flood/Set Rate Threshold", function()
         local handle = io.popen("zenity --entry --title='Set SYN Rate Threshold' --text='Enter the rate threshold (packets/second):'")
         if handle then
@@ -267,7 +276,7 @@ local function register_menu_actions()
             Create_popup("Failed to open input prompt.")
         end
     end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/UDP Flood/Toggle", function() toggledissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/UDP Flood/Toggle", function() toggle_dissector("UDPFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/UDP Flood/Set Rate Threshold", function()
         local handle = io.popen("zenity --entry --title='Set UDP Rate Threshold' --text='Enter the rate threshold (packets/second):'")
         if handle then
@@ -291,7 +300,7 @@ local function register_menu_actions()
             Create_popup("Failed to open input prompt.")
         end
     end, MENU_TOOLS_UNSORTED)
-    register_menu("DDoS Detection/ICMP Flood/Toggle", function() toggledissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/ICMP Flood/Toggle", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/ICMP Flood/Set Rate Threshold", function()
         local handle = io.popen("zenity --entry --title='Set ICMP Rate Threshold' --text='Enter the rate threshold (packets/second):'")
         if handle then
