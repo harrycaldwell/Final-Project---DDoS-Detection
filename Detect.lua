@@ -48,6 +48,30 @@ local alerted_ips = {}
 -- Field Extractors
 local tcp_flags_f = Field.new("tcp.flags")
 
+-- Cleanup Function
+local function cleanup_tables()
+    -- Clear all trackers
+    print("calling cleanup")
+    for tracker_name, tracker in pairs(trackers) do
+        if tracker then
+            print("Clearing tracker: " .. tracker_name)
+            for key in pairs(tracker) do
+                print("Removing key: " .. key .. " from tracker: " .. tracker_name)
+                tracker[key] = nil
+            end
+        end
+    end
+
+    -- Clear alert_triggered table
+    print("Clearing alert_triggered table")
+    for key in pairs(alert_triggered) do
+        print("Removing alert key: " .. key)
+        alert_triggered[key] = nil
+    end
+
+    print("All trackers and alerts have been cleared.")
+end
+
 -- Utility Functions
 local function log_alert(protocol, key, count, tree, buffer)
     print(protocol .. " Flood detected: " .. key .. " (" .. count .. " packets)")
@@ -66,7 +90,7 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         log_alert(protocol, key, tracker[key].count, tree, buffer)
         alerted_ips[src_ip] = true
         alert_triggered[key] = true
-        Cleanup_tables() -- Clear trackers after alert_triggered
+        cleanup_tables() -- Clear trackers after alert_triggered
     end
 end
 
@@ -158,28 +182,6 @@ function IMCPFlood.dissector(buffer, pinfo, tree)
     end)
 end
 
--- Cleanup Function
-function Cleanup_tables()
-    -- Clear all trackers
-    for tracker_name, tracker in pairs(trackers) do
-        if tracker then
-            print("Clearing tracker: " .. tracker_name)
-            for key in pairs(tracker) do
-                print("Removing key: " .. key .. " from tracker: " .. tracker_name)
-                tracker[key] = nil
-            end
-        end
-    end
-
-    -- Clear alert_triggered table
-    print("Clearing alert_triggered table")
-    for key in pairs(alert_triggered) do
-        print("Removing alert key: " .. key)
-        alert_triggered[key] = nil
-    end
-
-    print("All trackers and alerts have been cleared.")
-end
 
 -- GUI Helper Function
 function Create_popup(message)
