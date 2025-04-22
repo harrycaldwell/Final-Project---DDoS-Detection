@@ -160,14 +160,24 @@ end
 
 -- Cleanup Function
 function Cleanup_tables()
-    for _, tracker in pairs(trackers) do
-        for key in pairs(tracker) do
-            tracker[key] = nil
+    -- Clear all trackers
+    for tracker_name, tracker in pairs(trackers) do
+        if tracker then
+            print("Clearing tracker: " .. tracker_name)
+            for key in pairs(tracker) do
+                print("Removing key: " .. key .. " from tracker: " .. tracker_name)
+                tracker[key] = nil
+            end
         end
     end
+
+    -- Clear alert_triggered table
+    print("Clearing alert_triggered table")
     for key in pairs(alert_triggered) do
+        print("Removing alert key: " .. key)
         alert_triggered[key] = nil
     end
+
     print("All trackers and alerts have been cleared.")
 end
 
