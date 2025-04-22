@@ -90,8 +90,8 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         log_alert(protocol, key, tracker[key].count, tree, buffer)
         alerted_ips[src_ip] = true
         alert_triggered[key] = true
-        cleanup_tables() -- Clear trackers after alert_triggered
     end
+    cleanup_tables() -- Clear trackers and alerts after logging
 end
 
 local function track_packet(tracker, key)
@@ -166,6 +166,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
         local tcp_flags = tonumber(tostring(tcp_flags_field))
         return bit.band(tcp_flags, 0x02) ~= 0 -- Only process packets with the SYN flag set
     end)
+
 end
 
 -- UDP Flood Detection
