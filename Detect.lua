@@ -128,7 +128,7 @@ local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_th
 
     local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
-    local dst_port = tostring(pinfo.dst_port)
+    local dst_port = tonumber(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     -- port filtering
