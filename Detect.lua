@@ -128,7 +128,7 @@ local function track_packet_rate(tracker, key, rate_threshold)
     -- Check if the rate exceeds the threshold
     if packet_rate >= rate_threshold then
         print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
-        trigger_alert("HighRate", key, tracker, key, nil, nil) -- Trigger alert
+        trigger_alert("High Rate", key, tracker, key, nil, nil) -- Trigger alert
     end
 end
 
@@ -153,8 +153,13 @@ local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_th
 
     local src_ip = tostring(pinfo.src)
     local dst_ip = tostring(pinfo.dst)
-    local dst_port = tostring(pinfo.dst_port)
+    local dst_port = tonumber(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
+
+    -- port filtering
+    if port ~= 0 and dst_port ~= port then
+        return -- Skip packets that don't match the specified port
+    end
 
     detect_flood(protocol, tracker, key, src_ip, tree, buffer, rate_threshold)
 end
@@ -172,9 +177,7 @@ end
 
 -- UDP Flood Detection
 function UDPFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("UDPFlood", trackers.UDPFlood, pinfo, tree, buffer, udp_rate_threshold, function(pinfo)
-        return pinfo.cols.protocol == "UDP"
-    end)
+    generic_dissector("UDPFlood", trackers.UDPFlood, pinfo, tree, buffer, udp_rate_threshold)
 end
 
 -- ICMP Flood Detection
