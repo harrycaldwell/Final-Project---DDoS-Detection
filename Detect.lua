@@ -66,6 +66,7 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         log_alert(protocol, key, tracker[key].count, tree, buffer)
         alerted_ips[src_ip] = true
         alert_triggered[key] = true
+        Cleanup_tables() -- Clear trackers after alert_triggered
     end
 end
 
