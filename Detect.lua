@@ -151,23 +151,23 @@ end
 -- Reusable Dissector Function
 local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_threshold, filter_function)
     if not dissector_states[protocol] then return end
-    if filter_function and not filter_function(pinfo) then return end
+        if filter_function and not filter_function(pinfo) then return end
 
-    local src_ip = tostring(pinfo.src)
-    local dst_ip = tostring(pinfo.dst)
-    local dst_port = tonumber(pinfo.dst_port)
-    local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
+            local src_ip = tostring(pinfo.src)
+            local dst_ip = tostring(pinfo.dst)
+            local dst_port = tonumber(pinfo.dst_port)
+            local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
-    -- skipping port filtering if dissector is ICMPFlood
-    if protocol == "ICMPFlood" then
-        key = src_ip .. "->" .. dst_ip
-    end
+            -- skipping port filtering if dissector is ICMPFlood
+            if protocol == "ICMPFlood" then
+                key = src_ip .. "->" .. dst_ip
+            else
+            -- port filtering
+            if port ~= 0 and dst_port ~= port then
+                return -- Skip packets that don't match the specified port
+            end
 
-    -- port filtering
-    if port ~= 0 and dst_port ~= port then
-        return -- Skip packets that don't match the specified port
-    end
-
+            end
     detect_flood(protocol, tracker, key, src_ip, tree, buffer, rate_threshold)
 end
 
@@ -190,7 +190,6 @@ end
 -- ICMP Flood Detection
 function ICMPFlood.dissector(buffer, pinfo, tree)
     generic_dissector("ICMPFlood", trackers.ICMPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
-        return pinfo.cols.protocol == "ICMP"
     end)
 end
 
