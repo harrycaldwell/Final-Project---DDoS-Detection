@@ -50,26 +50,17 @@ local tcp_flags_f = Field.new("tcp.flags")
 
 -- Cleanup Function
 local function cleanup_tables()
-    -- Clear all trackers
-    print("calling cleanup")
-    for tracker_name, tracker in pairs(trackers) do
-        if tracker then
-            print("Clearing tracker: " .. tracker_name)
-            for key in pairs(tracker) do
-                print("Removing key: " .. key .. " from tracker: " .. tracker_name)
-                tracker[key] = nil
-            end
+    for _, tracker in pairs(trackers) do
+        for key, _ in pairs(tracker) do
+            tracker[key] = nil
         end
     end
-
-    -- Clear alert_triggered table
-    print("Clearing alert_triggered table")
-    for key in pairs(alert_triggered) do
-        print("Removing alert key: " .. key)
+    for key, _ in pairs(alerted_ips) do
+        alerted_ips[key] = nil
+    end
+    for key, _ in pairs(alert_triggered) do
         alert_triggered[key] = nil
     end
-
-    print("All trackers and alerts have been cleared.")
 end
 
 -- Utility Functions
@@ -348,6 +339,11 @@ local function register_menu_actions()
         else
             Create_popup("Failed to open input prompt.")
         end
+    end, MENU_TOOLS_UNSORTED)
+
+    register_menu("DDoS Detection/Reset Trackers", function()
+        cleanup_tables()
+        Create_popup("All trackers and alerts have been cleared.")
     end, MENU_TOOLS_UNSORTED)
 
 end
