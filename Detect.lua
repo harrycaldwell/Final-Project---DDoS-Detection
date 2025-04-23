@@ -14,7 +14,7 @@ ICMPFlood = Proto("ICMPFlood", "ICMP Flood Attack Detection")
 -- Make Proto objects globally accessible
 _G["SynFlood"] = SynFlood
 _G["UDPFlood"] = UDPFlood
-_G["IMCPFlood"] = IMCPFlood
+_G["ICMPFlood"] = ICMPFlood
 
 -- Configuration
 local config = {
@@ -29,7 +29,7 @@ local alert_triggered = {}
 local dissector_states = {
     SYNFlood = false,
     UDPFlood = false,
-    IMCPFlood = false
+    ICMPFlood = false
 }
 
 local syn_rate_threshold = 10000 -- Packets per second for SYN flood detection
@@ -40,7 +40,7 @@ local icmp_rate_threshold = 200 -- Packets per second for ICMP flood detection
 local trackers = {
     SYNFlood = {},
     UDPFlood = {},
-    IMCPFlood = {},
+    ICMPFlood = {},
     packet_rate = {}
 }
 local alerted_ips = {}
@@ -159,7 +159,7 @@ local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_th
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
     -- skipping port filtering if dissector is ICMPFlood
-    if protocol == "IMCPFlood" then
+    if protocol == "ICMPFlood" then
         key = src_ip .. "->" .. dst_ip
     end
 
@@ -189,7 +189,7 @@ end
 
 -- ICMP Flood Detection
 function ICMPFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("ICMPFlood", trackers.IMCPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
+    generic_dissector("ICMPFlood", trackers.ICMPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
         return pinfo.cols.protocol == "ICMP"
     end)
 end
@@ -245,7 +245,7 @@ end
 -- Registering Dissectors
 register_dissector("SynFlood")
 register_dissector("UDPFlood")
-register_dissector("IMCPFlood")
+register_dissector("ICMPFlood")
 
 -- GUI Menu Registration
 local function register_menu_actions()
@@ -321,7 +321,7 @@ local function register_menu_actions()
         end
     end, MENU_TOOLS_UNSORTED)
 
-    register_menu("DDoS Detection/ICMP Flood/Toggle", function() toggle_dissector("IMCPFlood") end, MENU_TOOLS_UNSORTED)
+    register_menu("DDoS Detection/ICMP Flood/Toggle", function() toggle_dissector("ICMPFlood") end, MENU_TOOLS_UNSORTED)
     register_menu("DDoS Detection/ICMP Flood/Set Rate Threshold", function()
         local handle = io.popen("zenity --entry --title='Set ICMP Rate Threshold' --text='Enter the rate threshold (packets/second):'")
         if handle then
