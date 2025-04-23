@@ -47,6 +47,7 @@ local alerted_ips = {}
 
 -- Field Extractors
 local tcp_flags_f = Field.new("tcp.flags")
+local ip_proto_f = Field.new("ip.proto")
 
 -- Cleanup Function
 local function cleanup_tables()
@@ -190,6 +191,9 @@ end
 -- ICMP Flood Detection
 function ICMPFlood.dissector(buffer, pinfo, tree)
     generic_dissector("ICMPFlood", trackers.ICMPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
+        local proto_field = ip_proto_f()
+        if not proto_field then return false end
+        return tonumber(tostring(proto_field)) == 1
     end)
 end
 
