@@ -48,26 +48,53 @@ local alerted_ips = {}
 -- Field Extractors
 local tcp_flags_f = Field.new("tcp.flags")
 
+-- Cleanup Function
+local function cleanup_tables()
+    for _, tracker in pairs(trackers) do
+        for key, _ in pairs(tracker) do
+            tracker[key] = nil
+        end
+    end
+    for key, _ in pairs(alerted_ips) do
+        alerted_ips[key] = nil
+    end
+    for key, _ in pairs(alert_triggered) do
+        alert_triggered[key] = nil
+    end
+end
+
 -- Utility Functions
 local function log_alert(protocol, key, count, tree, buffer)
     print(protocol .. " Flood detected: " .. key .. " (" .. count .. " packets)")
     local subtree = tree:add(_G[protocol], buffer(), protocol .. " Flood Detection")
     subtree:add(buffer(), protocol .. " Flood detected: " .. key)
     subtree:add(buffer(), protocol .. " packet count: " .. count)
-    subtree:add(buffer(), "Threshold: " .. threshold)
+    subtree:add(buffer(), "Threshold: " .. rate_threshold .. " packets/second")
 end
 
 local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
-    if not alerted_ips[src_ip] then
-        print("IP " .. src_ip .. " has triggered an alert and is now logged.")
-        if gui_enabled() then
-            Create_popup(protocol .. " Flood detected: " .. key .. " (" .. tracker[key].count .. " packets)")
-        end
-        log_alert(protocol, key, tracker[key].count, tree, buffer)
-        alerted_ips[src_ip] = true
-        alert_triggered[key] = true
-        Cleanup_tables() -- Clear trackers after alert_triggered
+    -- Check if the src_ip is already in the alerted_ips table
+    if alerted_ips[src_ip] then
+        print("IP " .. src_ip .. " is already in alerted_ips. Skipping alert.")
+        return -- Exit the function if the IP is already alerted
     end
+
+    -- Add the src_ip to the alerted_ips table
+    print("IP " .. src_ip .. " has triggered an alert and is now logged.")
+    alerted_ips[src_ip] = true -- Add the IP to the table
+
+    -- Log the alert and handle GUI notifications
+    if gui_enabled() then
+        Create_popup(protocol .. " Flood detected: " .. key .. " (" .. tracker[key].count .. " packets)")
+    end
+    log_alert(protocol, key, tracker[key].count, tree, buffer)
+
+    -- Mark the alert as triggered
+    alert_triggered[key] = true
+
+    -- Clear only the specific key from the tracker
+    print("Clearing tracker data for key: " .. key)
+    tracker[key] = nil
 end
 
 local function track_packet(tracker, key)
@@ -102,7 +129,7 @@ local function track_packet_rate(tracker, key, rate_threshold)
 
     -- Check if the rate exceeds the threshold
     if packet_rate >= rate_threshold then
-        print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
+        --print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
         trigger_alert("High Rate", key, tracker, key, nil, nil) -- Trigger alert
     end
 end
@@ -147,6 +174,7 @@ function SynFlood.dissector(buffer, pinfo, tree)
         local tcp_flags = tonumber(tostring(tcp_flags_field))
         return bit.band(tcp_flags, 0x02) ~= 0 -- Only process packets with the SYN flag set
     end)
+
 end
 
 -- UDP Flood Detection
@@ -161,18 +189,6 @@ function IMCPFlood.dissector(buffer, pinfo, tree)
     end)
 end
 
--- Cleanup Function
-function Cleanup_tables()
-    for _, tracker in pairs(trackers) do
-        for key in pairs(tracker) do
-            tracker[key] = nil
-        end
-    end
-    for key in pairs(alert_triggered) do
-        alert_triggered[key] = nil
-    end
-    print("All trackers and alerts have been cleared.")
-end
 
 -- GUI Helper Function
 function Create_popup(message)
@@ -234,7 +250,6 @@ local function register_menu_actions()
             local input = handle:read("*a")
             handle:close()
             input = input and input:match("^%s*(.-)%s*$") or ""
-
             if input == "" then
                 Create_popup("Port update canceled.")
                 return
@@ -324,6 +339,11 @@ local function register_menu_actions()
         else
             Create_popup("Failed to open input prompt.")
         end
+    end, MENU_TOOLS_UNSORTED)
+
+    register_menu("DDoS Detection/Reset Trackers", function()
+        cleanup_tables()
+        Create_popup("All trackers and alerts have been cleared.")
     end, MENU_TOOLS_UNSORTED)
 
 end
