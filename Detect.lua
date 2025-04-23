@@ -158,6 +158,11 @@ local function generic_dissector(protocol, tracker, pinfo, tree, buffer, rate_th
     local dst_port = tonumber(pinfo.dst_port)
     local key = src_ip .. "->" .. dst_ip .. ":" .. dst_port
 
+    -- skipping port filtering if dissector is ICMPFlood
+    if protocol == "IMCPFlood" then
+        key = src_ip .. "->" .. dst_ip
+    end
+
     -- port filtering
     if port ~= 0 and dst_port ~= port then
         return -- Skip packets that don't match the specified port
