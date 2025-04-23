@@ -49,7 +49,7 @@ local alerted_ips = {}
 local tcp_flags_f = Field.new("tcp.flags")
 
 -- Cleanup Function
-function cleanup_tables()
+local function cleanup_tables()
     -- Clear all trackers
     print("calling cleanup")
     for tracker_name, tracker in pairs(trackers) do
@@ -78,7 +78,7 @@ local function log_alert(protocol, key, count, tree, buffer)
     local subtree = tree:add(_G[protocol], buffer(), protocol .. " Flood Detection")
     subtree:add(buffer(), protocol .. " Flood detected: " .. key)
     subtree:add(buffer(), protocol .. " packet count: " .. count)
-    subtree:add(buffer(), "Threshold: " .. threshold)
+    subtree:add(buffer(), "Threshold: " .. rate_threshold .. " packets/second")
 end
 
 local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
@@ -92,7 +92,10 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
         alert_triggered[key] = true
 
     end
-    cleanup_tables() -- Call cleanup_tables after triggering an alert
+        -- Only clear that key’s data to avoid race conditions
+        print("Clearing tracker data for key: " .. key)
+        tracker[key] = nil
+        trackers.packet_rate[key] = nil
 end
 
 local function track_packet(tracker, key)
