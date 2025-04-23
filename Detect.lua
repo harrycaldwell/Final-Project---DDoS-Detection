@@ -9,7 +9,7 @@ local plugin_info = {
 -- Proto Declarations
 SynFlood = Proto("SYNFlood", "SYN Flood Attack Detection")
 UDPFlood = Proto("UDPFlood", "UDP Flood Attack Detection")
-IMCPFlood = Proto("IMCPFlood", "ICMP Flood Attack Detection")
+ICMPFlood = Proto("ICMPFlood", "ICMP Flood Attack Detection")
 
 -- Make Proto objects globally accessible
 _G["SynFlood"] = SynFlood
@@ -183,8 +183,8 @@ function UDPFlood.dissector(buffer, pinfo, tree)
 end
 
 -- ICMP Flood Detection
-function IMCPFlood.dissector(buffer, pinfo, tree)
-    generic_dissector("IMCPFlood", trackers.IMCPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
+function ICMPFlood.dissector(buffer, pinfo, tree)
+    generic_dissector("ICMPFlood", trackers.IMCPFlood, pinfo, tree, buffer, icmp_rate_threshold, function(pinfo)
         return pinfo.cols.protocol == "ICMP"
     end)
 end
