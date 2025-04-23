@@ -82,20 +82,28 @@ local function log_alert(protocol, key, count, tree, buffer)
 end
 
 local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
-    if not alerted_ips[src_ip] then
-        print("IP " .. src_ip .. " has triggered an alert and is now logged.")
-        if gui_enabled() then
-            Create_popup(protocol .. " Flood detected: " .. key .. " (" .. tracker[key].count .. " packets)")
-        end
-        log_alert(protocol, key, tracker[key].count, tree, buffer)
-        alerted_ips[src_ip] = true
-        alert_triggered[key] = true
-
+    -- Check if the src_ip is already in the alerted_ips table
+    if alerted_ips[src_ip] then
+        print("IP " .. src_ip .. " is already in alerted_ips. Skipping alert.")
+        return -- Exit the function if the IP is already alerted
     end
-        -- Only clear that key’s data to avoid race conditions
-        print("Clearing tracker data for key: " .. key)
-        tracker[key] = nil
-        trackers.packet_rate[key] = nil
+
+    -- Add the src_ip to the alerted_ips table
+    print("IP " .. src_ip .. " has triggered an alert and is now logged.")
+    alerted_ips[src_ip] = true -- Add the IP to the table
+
+    -- Log the alert and handle GUI notifications
+    if gui_enabled() then
+        Create_popup(protocol .. " Flood detected: " .. key .. " (" .. tracker[key].count .. " packets)")
+    end
+    log_alert(protocol, key, tracker[key].count, tree, buffer)
+
+    -- Mark the alert as triggered
+    alert_triggered[key] = true
+
+    -- Clear only the specific key from the tracker
+    print("Clearing tracker data for key: " .. key)
+    tracker[key] = nil
 end
 
 local function track_packet(tracker, key)
@@ -130,7 +138,7 @@ local function track_packet_rate(tracker, key, rate_threshold)
 
     -- Check if the rate exceeds the threshold
     if packet_rate >= rate_threshold then
-        print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
+        --print("High packet rate detected for " .. key .. ": " .. packet_rate .. " packets/second")
         trigger_alert("High Rate", key, tracker, key, nil, nil) -- Trigger alert
     end
 end
