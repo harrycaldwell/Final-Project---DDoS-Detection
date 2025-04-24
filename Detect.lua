@@ -90,6 +90,15 @@ local function trigger_alert(protocol, key, tracker, src_ip, tree, buffer)
     end
     log_alert(protocol, key, tracker[key].count, tree, buffer)
 
+    io.output(assert("alert_log.txt", "a"))
+    if protocol == ICMPFlood then
+    io.write("Alert: " .. protocol .. " Flood detected from " .. src_ip .. " (" .. tracker[key].count .. " packets)\n")
+    else
+        io.write("Alert: " .. protocol .. " Flood detected from " .. src_ip .. ":" .. port .. " (" .. tracker[key].count .. " packets)\n")
+    end
+    io.close()
+
+
     -- Mark the alert as triggered
     alert_triggered[key] = true
 
